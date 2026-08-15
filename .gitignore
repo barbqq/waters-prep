@@ -41,3 +41,6 @@ coverage/
 PKI/
 certificates/
 *.pem
+
+# Personal working files
+PLAN.md
