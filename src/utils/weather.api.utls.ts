@@ -1,4 +1,4 @@
-import { APIResponse } from '@playwright/test';
+import { APIResponse, Response as PlaywrightResponse } from '@playwright/test';
 
 export interface OpenWeatherResponse {
   current: {
@@ -20,7 +20,7 @@ export function isOpenWeatherResponse(json: unknown): json is OpenWeatherRespons
 }
 
 export async function parseOpenWeatherResponse(
-  response: APIResponse,
+  response: APIResponse | Response | PlaywrightResponse,
 ): Promise<OpenWeatherResponse> {
   const json: unknown = await response.json();
   if (!isOpenWeatherResponse(json)) {

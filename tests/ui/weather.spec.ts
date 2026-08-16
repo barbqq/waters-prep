@@ -1,68 +1,51 @@
 import { test } from '@fixtures/pages.fixtures';
 import { expect } from '@playwright/test';
 import { parseOpenWeatherResponse } from '../../src/utils/weather.api.utls';
+import {
+  ONE_CALL_WIDGET_URL,
+  mockWeatherTemperature,
+  mockWeatherError,
+} from '../../src/utils/weather.mocks';
 
 const CITY_NAME = 'Minsk';
-const ONE_CALL_WIDGET_URL = '**/api/widget/onecall*';
 const OUT_OF_RANGE_TEMPERATURE = 999;
 
-test('Check baseline displayed correctly', async ({ page, searchPage, weatherPage }) => {
-  await searchPage.verifyPageOpened();
-
-  const apiTempPromise = new Promise<number>((resolve) => {
-    void page.route(ONE_CALL_WIDGET_URL, async (route) => {
-      const response = await route.fetch();
-      const json = await parseOpenWeatherResponse(response);
-
-      resolve(Math.round(json.current.temp));
-      await route.fulfill({ response });
-    });
+test.describe('Weather Widget Tests', () => {
+  test.beforeEach(async ({ searchPage }) => {
+    await searchPage.verifyPageOpened();
   });
 
-  await searchPage.selectCity(CITY_NAME);
+  test('Check baseline displayed correctly', async ({ page, searchPage, weatherPage }) => {
+    const responsePromise = page.waitForResponse(ONE_CALL_WIDGET_URL);
 
-  const apiTemp = await apiTempPromise;
-  await expect(weatherPage.temperatureLocator).toContainText(apiTemp.toString());
-});
+    await searchPage.selectCity(CITY_NAME);
 
-test('Check out-of-range hardware reading (999°C) displayed correctly', async ({
-  page,
-  searchPage,
-  weatherPage,
-}) => {
-  await searchPage.verifyPageOpened();
-
-  await page.route(ONE_CALL_WIDGET_URL, async (route) => {
-    const response = await route.fetch();
+    const response = await responsePromise;
     const json = await parseOpenWeatherResponse(response);
+    const expectedTemp = Math.round(json.current.temp);
 
-    json.current.temp = OUT_OF_RANGE_TEMPERATURE;
-
-    await route.fulfill({
-      status: response.status(),
-      json,
-    });
+    await expect(weatherPage.temperatureLocator).toContainText(expectedTemp.toString());
   });
 
-  await searchPage.selectCity(CITY_NAME);
+  test('Check out-of-range hardware reading (999°C) displayed correctly', async ({
+    page,
+    searchPage,
+    weatherPage,
+  }) => {
+    await mockWeatherTemperature(page, OUT_OF_RANGE_TEMPERATURE);
+    await searchPage.selectCity(CITY_NAME);
 
-  await expect(weatherPage.temperatureLocator).toContainText(OUT_OF_RANGE_TEMPERATURE.toString());
-});
-
-test('Check UI handles HTTP 500 server error gracefully', async ({
-  page,
-  searchPage,
-  weatherPage,
-}) => {
-  await searchPage.verifyPageOpened();
-
-  await page.route(ONE_CALL_WIDGET_URL, async (route) => {
-    await route.fulfill({
-      status: 500,
-    });
+    await expect(weatherPage.temperatureLocator).toContainText(OUT_OF_RANGE_TEMPERATURE.toString());
   });
 
-  await searchPage.selectCity(CITY_NAME);
+  test('Check UI handles HTTP 500 server error gracefully', async ({
+    page,
+    searchPage,
+    weatherPage,
+  }) => {
+    await mockWeatherError(page, 500);
+    await searchPage.selectCity(CITY_NAME);
 
-  await expect(weatherPage.warningMessageLocator).toBeVisible();
+    await expect(weatherPage.warningMessageLocator).toBeVisible();
+  });
 });
