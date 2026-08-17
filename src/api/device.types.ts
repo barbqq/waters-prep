@@ -19,9 +19,11 @@ export interface DevicePayload {
 }
 
 // Единственная точка входа в жизненный цикл — provisionDevice (всегда 'provisioned').
-// Публичный API устройств не проверяет переходы сам, поэтому это делает DeviceApiClient.
+// Публичный API устройств не проверяет переходы сам, поэтому это делает DeviceActions.
+// active -> active разрешён намеренно: обновление прошивки на работающем устройстве —
+// легальная операция и может повторяться. Списание разрешено только из active.
 export const ALLOWED_TRANSITIONS: Record<DeviceStatus, DeviceStatus[]> = {
   provisioned: ['active'],
-  active: ['decommissioned'],
+  active: ['active', 'decommissioned'],
   decommissioned: [],
 };

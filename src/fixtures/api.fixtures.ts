@@ -12,7 +12,13 @@ interface Fixtures {
 export const test = base.extend<Fixtures>({
   deviceActions: async ({ request }, use) => {
     const gateway = new DeviceGateway(request, config.api.baseURL, new ApiLogger());
-    await use(new DeviceActions(gateway));
+    const deviceActions = new DeviceActions(gateway);
+
+    await use(deviceActions);
+
+    // Таргет — общий публичный датасет: не оставляем в нём созданные устройства,
+    // если тест упал где-то между provision и decommission.
+    await deviceActions.cleanup();
   },
 });
 

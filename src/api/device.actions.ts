@@ -1,5 +1,6 @@
 import { step } from '@core/decorator';
 import { DeviceGateway } from '@api/device.gateway';
+import { InvalidTransitionError } from '@api/device.errors';
 import { ALLOWED_TRANSITIONS, Device, DeviceSpec, DeviceStatus } from '@api/device.types';
 
 // Бизнес-операции над устройством: держит состояние переходов и проверяет их
@@ -22,9 +23,9 @@ export class DeviceActions {
     return this.gateway.getDevice(id);
   }
 
-  @step('Verifying device {0} is decommissioned')
-  async verifyDecommissioned(id: string): Promise<void> {
-    await this.gateway.verifyDecommissioned(id);
+  @step('Getting response status for device {0}')
+  async getDeviceStatus(id: string): Promise<number> {
+    return this.gateway.getDeviceStatus(id);
   }
 
   @step('Updating firmware of device {0} to {1}')
@@ -43,12 +44,18 @@ export class DeviceActions {
     this.devices.set(id, { ...current, status: 'decommissioned' });
   }
 
+  async cleanup(): Promise<void> {
+    for (const [id, spec] of this.devices) {
+      if (spec.status === 'decommissioned') continue;
+      await this.gateway.deleteDevice(id).catch(() => undefined);
+    }
+    this.devices.clear();
+  }
+
   private assertTransition(id: string, target: DeviceStatus): DeviceSpec {
     const current = this.devices.get(id);
     if (!current || !ALLOWED_TRANSITIONS[current.status].includes(target)) {
-      throw new Error(
-        `Invalid transition to "${target}" for device ${id} (current status: ${current?.status ?? 'unknown'})`,
-      );
+      throw new InvalidTransitionError(id, current?.status ?? 'unknown', target);
     }
     return current;
   }

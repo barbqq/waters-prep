@@ -1,8 +1,15 @@
+export enum HttpMethod {
+  GET = 'GET',
+  POST = 'POST',
+  PUT = 'PUT',
+  PATCH = 'PATCH',
+  DELETE = 'DELETE',
+}
+
 export interface RequestLog {
   type: 'request';
   method: string;
   url: string;
-  headers: Record<string, string>;
   body?: unknown;
 }
 

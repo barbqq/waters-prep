@@ -1,6 +1,12 @@
 import { APIRequestContext, APIResponse } from '@playwright/test';
 
+import { HttpMethod } from '@core/api/api.types';
 import { ApiLogger } from '@core/api/logger';
+
+export interface ApiResult<TResponse> {
+  status: number;
+  body: TResponse;
+}
 
 export class BaseApiClient {
   constructor(
@@ -9,60 +15,65 @@ export class BaseApiClient {
     private readonly logger: ApiLogger,
   ) {}
 
-  protected async get<TResponse>(path: string, expectedStatus: number): Promise<TResponse> {
-    const url = this.url(path);
-    this.logger.logRequest('GET', url, {});
-    const response = await this.request.get(url);
-    return this.handle<TResponse>(response, expectedStatus);
+  protected get<TResponse>(path: string, expectedStatus?: number): Promise<ApiResult<TResponse>> {
+    return this.send<undefined, TResponse>(HttpMethod.GET, path, undefined, expectedStatus);
   }
 
-  protected async post<TBody, TResponse>(
+  protected post<TRequest, TResponse>(
     path: string,
-    body: TBody,
-    expectedStatus: number,
-  ): Promise<TResponse> {
-    const url = this.url(path);
-    this.logger.logRequest('POST', url, {}, body);
-    const response = await this.request.post(url, { data: body });
-    return this.handle<TResponse>(response, expectedStatus);
+    body: TRequest,
+    expectedStatus?: number,
+  ): Promise<ApiResult<TResponse>> {
+    return this.send<TRequest, TResponse>(HttpMethod.POST, path, body, expectedStatus);
   }
 
-  protected async put<TBody, TResponse>(
+  protected put<TRequest, TResponse>(
     path: string,
-    body: TBody,
-    expectedStatus: number,
-  ): Promise<TResponse> {
-    const url = this.url(path);
-    this.logger.logRequest('PUT', url, {}, body);
-    const response = await this.request.put(url, { data: body });
-    return this.handle<TResponse>(response, expectedStatus);
+    body: TRequest,
+    expectedStatus?: number,
+  ): Promise<ApiResult<TResponse>> {
+    return this.send<TRequest, TResponse>(HttpMethod.PUT, path, body, expectedStatus);
   }
 
-  protected async delete(path: string, expectedStatus: number): Promise<void> {
-    const url = this.url(path);
-    this.logger.logRequest('DELETE', url, {});
-    const response = await this.request.delete(url);
-    await this.handle(response, expectedStatus);
+  protected delete<TResponse>(path: string, expectedStatus?: number): Promise<ApiResult<TResponse>> {
+    return this.send<undefined, TResponse>(HttpMethod.DELETE, path, undefined, expectedStatus);
   }
 
-  private url(path: string): string {
-    return `${this.baseURL}${path}`;
-  }
+  private async send<TRequest, TResponse>(
+    method: HttpMethod,
+    path: string,
+    body: TRequest,
+    expectedStatus?: number,
+  ): Promise<ApiResult<TResponse>> {
+    const url = `${this.baseURL}${path}`;
+    this.logger.logRequest(method, url, body);
 
-  private async handle<TResponse>(
-    response: APIResponse,
-    expectedStatus: number,
-  ): Promise<TResponse> {
+    const response = await this.request.fetch(url, {
+      method,
+      ...(body === undefined ? {} : { data: body }),
+    });
+
     const status = response.status();
-    const body = (await response.json()) as unknown;
-    this.logger.logResponse(status, body);
+    const parsed = await this.parseBody(response);
+    this.logger.logResponse(status, parsed);
 
-    if (status !== expectedStatus) {
+    if (expectedStatus !== undefined && status !== expectedStatus) {
       throw new Error(
         `Expected status ${expectedStatus}, but got ${status}\n\nRecent API logs:\n${this.logger.getRecentLogs()}`,
       );
     }
 
-    return body as TResponse;
+    return { status, body: parsed as TResponse };
+  }
+
+  private async parseBody(response: APIResponse): Promise<unknown> {
+    const raw = await response.text();
+    if (!raw) return undefined;
+
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      return raw;
+    }
   }
 }

@@ -1,26 +1,28 @@
 import { BaseApiClient } from '@core/api/api.client';
 import { Device, DevicePayload, DeviceSpec } from '@api/device.types';
 
-// Только сырые вызовы конкретных эндпоинтов, без бизнес-правил и состояния —
-// решение "провалидировать переход или нет" принимает DeviceActions.
 export class DeviceGateway extends BaseApiClient {
-  provisionDevice(name: string, data: DeviceSpec): Promise<Device> {
-    return this.post<DevicePayload, Device>('/objects', { name, data }, 200);
+  async provisionDevice(name: string, data: DeviceSpec): Promise<Device> {
+    const { body } = await this.post<DevicePayload, Device>('/objects', { name, data }, 200);
+    return body;
   }
 
-  getDevice(id: string): Promise<Device> {
-    return this.get<Device>(`/objects/${id}`, 200);
+  async getDevice(id: string): Promise<Device> {
+    const { body } = await this.get<Device>(`/objects/${id}`, 200);
+    return body;
   }
 
-  verifyDecommissioned(id: string): Promise<void> {
-    return this.get(`/objects/${id}`, 404);
+  async getDeviceStatus(id: string): Promise<number> {
+    const { status } = await this.get(`/objects/${id}`);
+    return status;
   }
 
-  replaceDevice(id: string, name: string, data: DeviceSpec): Promise<Device> {
-    return this.put<DevicePayload, Device>(`/objects/${id}`, { name, data }, 200);
+  async replaceDevice(id: string, name: string, data: DeviceSpec): Promise<Device> {
+    const { body } = await this.put<DevicePayload, Device>(`/objects/${id}`, { name, data }, 200);
+    return body;
   }
 
-  deleteDevice(id: string): Promise<void> {
-    return this.delete(`/objects/${id}`, 200);
+  async deleteDevice(id: string): Promise<void> {
+    await this.delete(`/objects/${id}`, 200);
   }
 }

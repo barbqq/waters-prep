@@ -1,10 +1,14 @@
 import { LogEntry } from '@core/api/api.types';
 
+// Сколько последних записей подмешивать в текст ошибки: три пары запрос/ответ —
+// достаточно, чтобы увидеть упавший вызов и то, что было прямо перед ним.
+const RECENT_ENTRIES = 6;
+
 export class ApiLogger {
   private readonly logs: LogEntry[] = [];
 
-  logRequest(method: string, url: string, headers: Record<string, string>, body?: unknown): void {
-    this.logs.push({ type: 'request', method, url, headers, body });
+  logRequest(method: string, url: string, body?: unknown): void {
+    this.logs.push({ type: 'request', method, url, body });
   }
 
   logResponse(status: number, body?: unknown): void {
@@ -13,6 +17,7 @@ export class ApiLogger {
 
   getRecentLogs(): string {
     return this.logs
+      .slice(-RECENT_ENTRIES)
       .map((log) => `=== ${log.type} ===\n${JSON.stringify(log, null, 2)}`)
       .join('\n\n');
   }
