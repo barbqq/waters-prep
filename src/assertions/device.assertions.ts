@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 
 import { InvalidTransitionError } from '@api/device.errors';
-import { Device, DeviceSpec } from '@api/device.types';
+import { Device, DeviceSpec, FirmwareVersion } from '@api/device.types';
 
 export class DeviceAssertions {
   static assertMatchesSpec(device: Device, spec: DeviceSpec): void {
@@ -9,12 +9,8 @@ export class DeviceAssertions {
     expect(device.data).toEqual(spec);
   }
 
-  static assertFirmware(device: Device, firmware: string): void {
+  static assertFirmware(device: Device, firmware: FirmwareVersion): void {
     expect(device.data.firmware).toBe(firmware);
-  }
-
-  static assertDeviceNotFound(status: number): void {
-    expect(status, 'Decommissioned device should no longer be retrievable').toBe(404);
   }
 
   static async assertRejectsInvalidTransition(action: Promise<unknown>): Promise<void> {

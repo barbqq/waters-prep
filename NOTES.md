@@ -2,20 +2,23 @@
 
 ## Architecture
 
-Three layers, deliberately kept separate so that lifecycle rules have exactly one home:
+Layers are wired by composition, each one owning exactly one concern:
 
-| Layer     | File                         | Responsibility                                                                                                                     |
-| --------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Transport | `src/core/api/api.client.ts` | HTTP only: build URL, send, parse body, log, verify expected status. Knows nothing about devices.                                  |
-| Gateway   | `src/api/device.gateway.ts`  | Raw device endpoints (`/objects`, `/objects/{id}`). No state, no business rules.                                                   |
-| Actions   | `src/api/device.actions.ts`  | Typed lifecycle operations (`provisionDevice`, `updateFirmware`, `decommissionDevice`), owns the state machine and the guard rail. |
+| Layer      | File                                  | Responsibility                                                                                                                     |
+| ---------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Transport  | `src/core/api/api.client.ts`          | HTTP only: build URL, send, parse body, log. Returns `{status, ok, body}` and never decides what counts as success.                |
+| Runner     | `src/core/api/api-action-runner.ts`   | Wraps a business operation in a reporter step and, when given an expected status, fails it with the recent request/response log.   |
+| Gateway    | `src/api/device.gateway.ts`           | Device endpoints (`/objects`, `/objects/{id}`) — URL and verb only. No state, no status codes, no rules.                           |
+| Actions    | `src/api/device.actions.ts`           | Typed lifecycle operations (`provisionDevice`, `updateFirmware`, `decommissionDevice`), owns the state machine and the guard rail. |
+| Assertions | `src/assertions/device.assertions.ts` | Every expectation the spec makes, including status codes.                                                                          |
 
-`get/post/put/delete` on the transport layer are `protected`, so tests physically cannot
-bypass the lifecycle rules with a raw HTTP call — the only entry points are the typed
-methods on `DeviceActions`.
+The fixture builds the chain (`ApiClient` → `DeviceGateway` + `ApiActionRunner` →
+`DeviceActions`) and injects only `DeviceActions` into the test, so a spec has no way to
+reach the raw HTTP client and bypass the lifecycle rules.
 
-Assertions live in `src/assertions/device.assertions.ts` rather than inline in the spec, so
-the test body reads as the lifecycle scenario from the task, one line per step.
+Step reporting is centralised in the runner rather than a `@step` decorator on every action
+method. That gives one place to extend with cross-cutting behaviour later, and lets step
+titles be built from the actual arguments (`Update firmware of device <id> to v1.3.1`).
 
 ## Device lifecycle state machine
 
@@ -56,21 +59,26 @@ gateway therefore wraps the hardware spec into `{name, data}`, and `name` is set
 device model. Field names inside `data` are kept in the task's snake_case (`sensor_type`)
 rather than normalised to camelCase, so the stored document matches the task verbatim.
 
-**Client throws on unexpected status.** The transport layer takes the expected status code
-and raises if it differs, embedding the recent request/response log in the message. This
-keeps the happy path free of status assertions. Where a status code _is_ the thing under
-test — the 404 after decommissioning — `getStatus()` returns the raw code instead and the
-expectation lives in the assertions layer, where it belongs.
+**Where status codes are checked.** The transport layer never judges a response — it hands
+back `{status, ok, body}`. Every action instead takes the status it expects as a parameter
+defaulting to `200`, and the runner raises `ApiActionError` (carrying the recent
+request/response log) when the actual status differs. The spec therefore states the
+expectation at the call site, the way `supertest`'s `.expect(200)` or REST Assured's
+`.statusCode(200)` do: `getDevice(id)` for the live device, `getDevice(id, NOT_FOUND)` for
+the decommissioned one. A default rather than a bare optional matters — omitting the
+argument still validates `200`, so a silent 500 can never slip through unchecked, and the
+one interesting status in the scenario stands out instead of drowning among repeated 200s.
+Negative flows need no escape hatch: they just name a different status.
+
+**Composition, not inheritance.** `DeviceGateway` takes an `ApiClient` as a constructor
+argument rather than extending it: a gateway _uses_ a transport, it is not one, and one
+client instance can back several gateways. The UI side keeps inheritance where the
+relationship really is "is-a" — page objects extend `BasePage` because they are pages.
 
 **Body parsing is defensive about content type.** The response body is read as text and
 parsed as JSON opportunistically. The target is a free public service; on a 429/503 it can
 return an HTML error page from a proxy, and `response.json()` would then throw a bare
 `SyntaxError`, destroying both the status information and the log trail.
-
-**Inheritance vs composition.** `DeviceGateway extends BaseApiClient` (it _is_ an API
-client for one resource), while `DeviceActions` takes a gateway as a constructor argument
-(it _uses_ one). The same rule is applied on the UI side: page objects extend `BasePage`
-because they are pages, while behaviour that merely consumes them is composed in.
 
 **Cleanup.** The collection is a shared public dataset, so the fixture calls
 `deviceActions.cleanup()` in teardown, deleting any device the client created that never
@@ -79,16 +87,12 @@ leak an object into a dataset other people are using. Errors during cleanup are 
 teardown must not turn a reported failure into a different, misleading one.
 
 **One test, not six.** The lifecycle steps share the generated device id and are strictly
-ordered, so they are one test. Granularity in the report comes from the `@step` decorator on
-the action methods instead, which yields a step per business operation.
+ordered, so they are one test. Granularity in the report comes from the runner, which emits
+one step per business operation.
 
-## Reading the report
-
-The HTML report shows a **failed step inside the passing lifecycle test**:
-`Decommissioning device <id>`. This is expected. That is the deliberate invalid-transition
-attempt — the action method is `@step`-decorated, and Playwright marks a step as failed
-whenever its callback throws, regardless of the caller catching it. The test asserts that
-this call is rejected, so the throw is the desired outcome.
+**The rejected transition leaves no failed step.** The guard runs before
+`performAction` is called, so the deliberately invalid decommission attempt never opens a
+reporter step — the report stays clean rather than showing a red step inside a passing test.
 
 ## With more time
 

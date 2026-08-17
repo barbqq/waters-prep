@@ -1,7 +1,5 @@
 import { LogEntry } from '@core/api/api.types';
 
-// Сколько последних записей подмешивать в текст ошибки: три пары запрос/ответ —
-// достаточно, чтобы увидеть упавший вызов и то, что было прямо перед ним.
 const RECENT_ENTRIES = 6;
 
 export class ApiLogger {

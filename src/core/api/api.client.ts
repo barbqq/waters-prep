@@ -1,50 +1,40 @@
 import { APIRequestContext, APIResponse } from '@playwright/test';
 
-import { HttpMethod } from '@core/api/api.types';
+import { ApiResponse, HttpMethod } from '@core/api/api.types';
 import { ApiLogger } from '@core/api/logger';
 
-export interface ApiResult<TResponse> {
-  status: number;
-  body: TResponse;
-}
-
-export class BaseApiClient {
+export class ApiClient {
   constructor(
-    protected readonly request: APIRequestContext,
-    protected readonly baseURL: string,
+    private readonly request: APIRequestContext,
+    private readonly baseURL: string,
     private readonly logger: ApiLogger,
   ) {}
 
-  protected get<TResponse>(path: string, expectedStatus?: number): Promise<ApiResult<TResponse>> {
-    return this.send<undefined, TResponse>(HttpMethod.GET, path, undefined, expectedStatus);
+  get<TResponse>(path: string): Promise<ApiResponse<TResponse>> {
+    return this.send<undefined, TResponse>(HttpMethod.GET, path, undefined);
   }
 
-  protected post<TRequest, TResponse>(
-    path: string,
-    body: TRequest,
-    expectedStatus?: number,
-  ): Promise<ApiResult<TResponse>> {
-    return this.send<TRequest, TResponse>(HttpMethod.POST, path, body, expectedStatus);
+  post<TRequest, TResponse>(path: string, body: TRequest): Promise<ApiResponse<TResponse>> {
+    return this.send<TRequest, TResponse>(HttpMethod.POST, path, body);
   }
 
-  protected put<TRequest, TResponse>(
-    path: string,
-    body: TRequest,
-    expectedStatus?: number,
-  ): Promise<ApiResult<TResponse>> {
-    return this.send<TRequest, TResponse>(HttpMethod.PUT, path, body, expectedStatus);
+  put<TRequest, TResponse>(path: string, body: TRequest): Promise<ApiResponse<TResponse>> {
+    return this.send<TRequest, TResponse>(HttpMethod.PUT, path, body);
   }
 
-  protected delete<TResponse>(path: string, expectedStatus?: number): Promise<ApiResult<TResponse>> {
-    return this.send<undefined, TResponse>(HttpMethod.DELETE, path, undefined, expectedStatus);
+  patch<TRequest, TResponse>(path: string, body: TRequest): Promise<ApiResponse<TResponse>> {
+    return this.send<TRequest, TResponse>(HttpMethod.PATCH, path, body);
+  }
+
+  delete<TResponse>(path: string): Promise<ApiResponse<TResponse>> {
+    return this.send<undefined, TResponse>(HttpMethod.DELETE, path, undefined);
   }
 
   private async send<TRequest, TResponse>(
     method: HttpMethod,
     path: string,
     body: TRequest,
-    expectedStatus?: number,
-  ): Promise<ApiResult<TResponse>> {
+  ): Promise<ApiResponse<TResponse>> {
     const url = `${this.baseURL}${path}`;
     this.logger.logRequest(method, url, body);
 
@@ -57,13 +47,7 @@ export class BaseApiClient {
     const parsed = await this.parseBody(response);
     this.logger.logResponse(status, parsed);
 
-    if (expectedStatus !== undefined && status !== expectedStatus) {
-      throw new Error(
-        `Expected status ${expectedStatus}, but got ${status}\n\nRecent API logs:\n${this.logger.getRecentLogs()}`,
-      );
-    }
-
-    return { status, body: parsed as TResponse };
+    return { status, ok: response.ok(), body: parsed as TResponse };
   }
 
   private async parseBody(response: APIResponse): Promise<unknown> {

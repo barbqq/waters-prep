@@ -1,28 +1,23 @@
-import { BaseApiClient } from '@core/api/api.client';
+import { ApiClient } from '@core/api/api.client';
+import { ApiResponse } from '@core/api/api.types';
 import { Device, DevicePayload, DeviceSpec } from '@api/device.types';
 
-export class DeviceGateway extends BaseApiClient {
-  async provisionDevice(name: string, data: DeviceSpec): Promise<Device> {
-    const { body } = await this.post<DevicePayload, Device>('/objects', { name, data }, 200);
-    return body;
+export class DeviceGateway {
+  constructor(private readonly client: ApiClient) {}
+
+  provisionDevice(name: string, data: DeviceSpec): Promise<ApiResponse<Device>> {
+    return this.client.post<DevicePayload, Device>('/objects', { name, data });
   }
 
-  async getDevice(id: string): Promise<Device> {
-    const { body } = await this.get<Device>(`/objects/${id}`, 200);
-    return body;
+  getDevice(id: string): Promise<ApiResponse<Device>> {
+    return this.client.get<Device>(`/objects/${id}`);
   }
 
-  async getDeviceStatus(id: string): Promise<number> {
-    const { status } = await this.get(`/objects/${id}`);
-    return status;
+  replaceDevice(id: string, name: string, data: DeviceSpec): Promise<ApiResponse<Device>> {
+    return this.client.put<DevicePayload, Device>(`/objects/${id}`, { name, data });
   }
 
-  async replaceDevice(id: string, name: string, data: DeviceSpec): Promise<Device> {
-    const { body } = await this.put<DevicePayload, Device>(`/objects/${id}`, { name, data }, 200);
-    return body;
-  }
-
-  async deleteDevice(id: string): Promise<void> {
-    await this.delete(`/objects/${id}`, 200);
+  deleteDevice(id: string): Promise<ApiResponse<unknown>> {
+    return this.client.delete(`/objects/${id}`);
   }
 }

@@ -6,6 +6,17 @@ export enum HttpMethod {
   DELETE = 'DELETE',
 }
 
+export enum HttpStatus {
+  OK = 200,
+  NOT_FOUND = 404,
+}
+
+export interface ApiResponse<TBody> {
+  status: number;
+  ok: boolean;
+  body: TBody;
+}
+
 export interface RequestLog {
   type: 'request';
   method: string;

@@ -1,9 +1,21 @@
-export type DeviceStatus = 'provisioned' | 'active' | 'decommissioned';
+export enum DeviceStatus {
+  PROVISIONED = 'provisioned',
+  ACTIVE = 'active',
+  DECOMMISSIONED = 'decommissioned',
+}
+
+export enum SensorType {
+  TEMPERATURE = 'temperature',
+  HUMIDITY = 'humidity',
+  PRESSURE = 'pressure',
+}
+
+export type FirmwareVersion = `v${number}.${number}.${number}`;
 
 export interface DeviceSpec {
   model: string;
-  sensor_type: string;
-  firmware: string;
+  sensor_type: SensorType;
+  firmware: FirmwareVersion;
   status: DeviceStatus;
 }
 
@@ -18,12 +30,8 @@ export interface DevicePayload {
   data: DeviceSpec;
 }
 
-// Единственная точка входа в жизненный цикл — provisionDevice (всегда 'provisioned').
-// Публичный API устройств не проверяет переходы сам, поэтому это делает DeviceActions.
-// active -> active разрешён намеренно: обновление прошивки на работающем устройстве —
-// легальная операция и может повторяться. Списание разрешено только из active.
 export const ALLOWED_TRANSITIONS: Record<DeviceStatus, DeviceStatus[]> = {
-  provisioned: ['active'],
-  active: ['active', 'decommissioned'],
-  decommissioned: [],
+  [DeviceStatus.PROVISIONED]: [DeviceStatus.ACTIVE],
+  [DeviceStatus.ACTIVE]: [DeviceStatus.ACTIVE, DeviceStatus.DECOMMISSIONED],
+  [DeviceStatus.DECOMMISSIONED]: [],
 };
