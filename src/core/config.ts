@@ -15,7 +15,7 @@ export interface Config {
 
 export const config: Config = {
   ui: { baseURL: process.env.UI_BASE_URL ?? 'https://openweathermap.org' },
-  api: { baseURL: process.env.API_BASE_URL ?? 'https://reqres.in/api' },
+  api: { baseURL: process.env.API_BASE_URL ?? 'https://api.restful-api.dev' },
   opcua: { endpoint: process.env.OPCUA_ENDPOINT ?? 'opc.tcp://localhost:4840' },
   timeouts: {
     navigation: Number(process.env.NAV_TIMEOUT ?? 30_000),

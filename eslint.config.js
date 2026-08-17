@@ -37,6 +37,7 @@ export default tseslint.config(
       'dist/',
       '*.config.js',
       'eslint.config.js',
+      'e2e-frame/',
     ],
   },
 );
