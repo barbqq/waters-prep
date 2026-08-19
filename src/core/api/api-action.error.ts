@@ -1,14 +1,15 @@
 import { ApiResponse } from '@core/api/api.types';
+import { LogFormatter } from '@core/logger/log-formatter';
 
-export class ApiActionError extends Error {
+export class ApiActionError<TBody> extends Error {
   constructor(
     action: string,
     expectedStatus: number,
-    readonly response: ApiResponse<unknown>,
-    logs: string,
+    readonly response: ApiResponse<TBody>,
   ) {
     super(
-      `${action}: expected status ${expectedStatus}, but got ${response.status}\n\nRecent API logs:\n${logs}`,
+      `Action "${action}" failed. Expected status ${expectedStatus}, but got ${response.status}.\n` +
+        `Response:\n${LogFormatter.format(response.body)}`,
     );
     this.name = 'ApiActionError';
   }

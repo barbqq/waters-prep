@@ -1,13 +1,14 @@
 import { APIRequestContext, APIResponse } from '@playwright/test';
 
 import { ApiResponse, HttpMethod } from '@core/api/api.types';
-import { ApiLogger } from '@core/api/logger';
+import { LogFormatter } from '@core/logger/log-formatter';
+import { AttachmentLogger } from '@core/logger/logger.types';
 
 export class ApiClient {
   constructor(
     private readonly request: APIRequestContext,
     private readonly baseURL: string,
-    private readonly logger: ApiLogger,
+    private readonly logger: AttachmentLogger,
   ) {}
 
   get<TResponse>(path: string): Promise<ApiResponse<TResponse>> {
@@ -36,7 +37,13 @@ export class ApiClient {
     body: TRequest,
   ): Promise<ApiResponse<TResponse>> {
     const url = `${this.baseURL}${path}`;
-    this.logger.logRequest(method, url, body);
+
+    await LogFormatter.attachJson(this.logger, `Request: ${method} ${path}`, {
+      timestamp: new Date().toISOString(),
+      method,
+      url,
+      ...(body === undefined ? {} : { body }),
+    });
 
     const response = await this.request.fetch(url, {
       method,
@@ -45,11 +52,18 @@ export class ApiClient {
 
     const status = response.status();
     const parsed = await this.parseBody(response);
-    this.logger.logResponse(status, parsed);
+
+    await LogFormatter.attachJson(this.logger, `Response ${status}: ${method} ${path}`, {
+      timestamp: new Date().toISOString(),
+      status,
+      body: parsed,
+    });
 
     return { status, ok: response.ok(), body: parsed as TResponse };
   }
 
+  // Публичный таргет может ответить HTML-страницей от прокси на 429/503.
+  // Без этого response.json() бросил бы SyntaxError, потеряв и статус, и тело.
   private async parseBody(response: APIResponse): Promise<unknown> {
     const raw = await response.text();
     if (!raw) return undefined;

@@ -12,12 +12,14 @@ export enum SensorType {
 
 export type FirmwareVersion = `v${number}.${number}.${number}`;
 
-export interface DeviceSpec {
+// Именно type, а не interface: у type-алиасов есть неявная индексная сигнатура,
+// без которой expect(...).toMatchObject(spec) не принимает этот тип.
+export type DeviceSpec = {
   model: string;
   sensor_type: SensorType;
   firmware: FirmwareVersion;
   status: DeviceStatus;
-}
+};
 
 export interface Device {
   id: string;

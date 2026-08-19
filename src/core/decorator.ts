@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { stepLogger } from '@core/logger/step-logger';
 
 export function step(stepName: string) {
   return function decorator<
@@ -11,7 +11,7 @@ export function step(stepName: string) {
         return argIndex < args.length ? String(args[argIndex]) : placeholder;
       });
 
-      return test.step(name, async () => target.call(this, ...args), { box: true });
+      return stepLogger.ui(name, () => target.call(this, ...args));
     } as T;
   };
 }

@@ -9,7 +9,21 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,
 
-  reporter: [["html", { open: "never" }], ["list"]],
+  reporter: [
+    ["list"],
+    ["html", { open: "never" }],
+    [
+      "allure-playwright",
+      {
+        resultsDir: "allure-results",
+        environmentInfo: {
+          UI_BASE_URL: config.ui.baseURL,
+          API_BASE_URL: config.api.baseURL,
+          OPCUA_ENDPOINT: config.opcua.endpoint,
+        },
+      },
+    ],
+  ],
 
   expect: { timeout: config.timeouts.assertion },
 

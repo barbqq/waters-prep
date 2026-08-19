@@ -1,12 +1,14 @@
-import { DeviceStatus } from '@api/device.types';
+import { Device, DeviceStatus } from '@api/device.types';
 
 export class InvalidTransitionError extends Error {
   constructor(
-    readonly deviceId: string,
-    readonly from: DeviceStatus | 'unknown',
-    readonly to: DeviceStatus,
+    readonly device: Device,
+    readonly target: DeviceStatus,
   ) {
-    super(`Invalid transition ${from} -> ${to} for device ${deviceId}`);
+    super(
+      `Invalid transition ${device.data.status} -> ${target} for device ${device.id}\n\n` +
+        `Current device state:\n${JSON.stringify(device, null, 2)}`,
+    );
     this.name = 'InvalidTransitionError';
   }
 }

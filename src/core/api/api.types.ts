@@ -11,23 +11,12 @@ export enum HttpStatus {
   NOT_FOUND = 404,
 }
 
+export enum ContentType {
+  JSON = 'application/json',
+}
+
 export interface ApiResponse<TBody> {
   status: number;
   ok: boolean;
   body: TBody;
 }
-
-export interface RequestLog {
-  type: 'request';
-  method: string;
-  url: string;
-  body?: unknown;
-}
-
-export interface ResponseLog {
-  type: 'response';
-  status: number;
-  body?: unknown;
-}
-
-export type LogEntry = RequestLog | ResponseLog;
