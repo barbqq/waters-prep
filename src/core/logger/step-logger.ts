@@ -7,6 +7,8 @@ const makeStep = async <T>(prefix: string, name: string, fn: () => T | Promise<T
 export const stepLogger = {
   api: async <T>(name: string, fn: () => T | Promise<T>): Promise<T> => makeStep('API', name, fn),
   ui: async <T>(name: string, fn: () => T | Promise<T>): Promise<T> => makeStep('UI', name, fn),
+  opcua: async <T>(name: string, fn: () => T | Promise<T>): Promise<T> =>
+    makeStep('OPCUA', name, fn),
   assertion: async <T>(name: string, fn: () => T | Promise<T>): Promise<T> =>
     makeStep('Assertion', name, fn),
   fixture: async <T>(name: string, fn: () => T | Promise<T>): Promise<T> =>
