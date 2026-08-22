@@ -13,14 +13,26 @@ import {
 
 import { LogFormatter } from '@core/logger/log-formatter';
 import { AttachmentLogger } from '@core/logger/logger.types';
+import { OpcUaConnectionError, OpcUaNotConnectedError } from '@core/opcua/opcua.errors';
 import {
-  OpcUaConnectionError,
-  OpcUaNotConnectedError,
-  OpcUaTimeoutError,
-} from '@core/opcua/opcua.errors';
-import { BrowsedNode, DataChangeHandler, OpcUaReading } from '@core/opcua/opcua.types';
+  BrowsedNode,
+  DataChangeHandler,
+  OpcUaClientOptions,
+  OpcUaDataTypeName,
+  OpcUaNodeClassName,
+  OpcUaReading,
+} from '@core/opcua/opcua.types';
+import { deepMerge } from '@core/utils/deep-merge';
 
-const CONNECT_TIMEOUT_MS = 10_000;
+// maxRetry: 0 — без него node-opcua переподключается по умолчанию долго и упорно,
+// и тест на недоступный эндпоинт вместо типизированной ошибки просто повиснет.
+const DEFAULT_OPTIONS: OpcUaClientOptions = {
+  securityMode: MessageSecurityMode.None,
+  securityPolicy: SecurityPolicy.None,
+  endpointMustExist: false,
+  connectionStrategy: { maxRetry: 0, initialDelay: 200, maxDelay: 1000 },
+};
+
 const PUBLISHING_INTERVAL_MS = 250;
 const SAMPLING_INTERVAL_MS = 100;
 
@@ -32,30 +44,27 @@ export class OpcUaClient {
   constructor(
     private readonly endpointUrl: string,
     private readonly logger: AttachmentLogger,
+    private readonly options: OpcUaClientOptions = {},
   ) {}
 
-  async connect(timeoutMs: number = CONNECT_TIMEOUT_MS): Promise<void> {
-    // maxRetry: 0 — без него node-opcua переподключается по умолчанию долго и упорно,
-    // и тест на недоступный эндпоинт вместо типизированной ошибки просто повиснет.
+  async connect(): Promise<void> {
+    const opts = deepMerge(DEFAULT_OPTIONS, this.options);
+
     const client = OPCUAClient.create({
-      endpointMustExist: false,
-      securityMode: MessageSecurityMode.None,
-      securityPolicy: SecurityPolicy.None,
-      connectionStrategy: { maxRetry: 0, initialDelay: 200, maxDelay: 1000 },
+      endpointMustExist: opts.endpointMustExist,
+      securityMode: opts.securityMode,
+      securityPolicy: opts.securityPolicy,
+      connectionStrategy: opts.connectionStrategy,
     });
 
     try {
-      await this.withTimeout(client.connect(this.endpointUrl), timeoutMs, 'connect');
-      this.session = await this.withTimeout(client.createSession(), timeoutMs, 'createSession');
+      await client.connect(this.endpointUrl);
+      this.session = await client.createSession();
       this.client = client;
     } catch (error) {
-      // Клиент мог успеть поднять сокет до падения на createSession — гасим его,
-      // иначе процесс воркера останется с висящим соединением.
+      // Соединение могло подняться, а createSession упасть — гасим сокет,
+      // иначе у воркера останется висящее подключение.
       await client.disconnect().catch(() => undefined);
-
-      if (error instanceof OpcUaTimeoutError) {
-        throw error;
-      }
 
       throw new OpcUaConnectionError(this.endpointUrl, error);
     }
@@ -68,7 +77,7 @@ export class OpcUaClient {
     const nodes = (result.references ?? []).map((reference) => ({
       nodeId: reference.nodeId.toString(),
       browseName: reference.browseName.toString(),
-      nodeClass: NodeClass[reference.nodeClass],
+      nodeClass: NodeClass[reference.nodeClass] as OpcUaNodeClassName,
     }));
 
     await LogFormatter.attachJson(this.logger, `Browse ${nodeId}`, nodes);
@@ -106,8 +115,6 @@ export class OpcUaClient {
     });
   }
 
-  // Идемпотентно: фикстура зовёт disconnect в teardown даже после падения теста,
-  // а порядок закрытия — подписка, сессия, соединение — обратен порядку создания.
   async disconnect(): Promise<void> {
     await this.subscription?.terminate();
     this.subscription = undefined;
@@ -131,27 +138,10 @@ export class OpcUaClient {
     return {
       nodeId,
       value: dataValue.value.value as unknown,
-      dataType: DataType[dataValue.value.dataType],
-      statusCode: dataValue.statusCode.toString(),
+     dataType: DataType[dataValue.value.dataType] as OpcUaDataTypeName,
+      // .name даёт 'Good', тогда как toString() — 'Good (0x00000000)'.
+      statusCode: dataValue.statusCode.name,
       sourceTimestamp: dataValue.sourceTimestamp ?? undefined,
     };
-  }
-
-  private async withTimeout<T>(
-    operation: Promise<T>,
-    timeoutMs: number,
-    name: string,
-  ): Promise<T> {
-    let timer: NodeJS.Timeout | undefined;
-
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new OpcUaTimeoutError(name, timeoutMs)), timeoutMs);
-    });
-
-    try {
-      return await Promise.race([operation, timeout]);
-    } finally {
-      clearTimeout(timer);
-    }
   }
 }

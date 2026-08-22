@@ -15,15 +15,6 @@ export class OpcUaConnectionError extends OpcUaError {
   }
 }
 
-export class OpcUaTimeoutError extends OpcUaError {
-  constructor(
-    readonly operation: string,
-    readonly timeoutMs: number,
-  ) {
-    super(`OPC UA operation "${operation}" did not complete within ${timeoutMs} ms`);
-  }
-}
-
 export class OpcUaNotConnectedError extends OpcUaError {
   constructor(readonly operation: string) {
     super(`Cannot ${operation}: OPC UA client has no active session`);

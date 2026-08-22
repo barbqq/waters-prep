@@ -4,9 +4,6 @@ import { stepLogger } from '@core/logger/step-logger';
 import { OpcUaClient } from '@core/opcua/opcua.client';
 import { BrowsedNode, DataChangeHandler, OpcUaReading } from '@core/opcua/opcua.types';
 
-const NODE_CLASS_VARIABLE = 'Variable';
-const NODE_CLASS_OBJECT = 'Object';
-
 export class TelemetryActions {
   constructor(
     private readonly client: OpcUaClient,
@@ -28,11 +25,11 @@ export class TelemetryActions {
   async discoverVariables(rootNodeId: string): Promise<BrowsedNode[]> {
     return stepLogger.opcua(`Discover variables under ${rootNodeId}`, async () => {
       const roots = await this.client.browse(rootNodeId);
-      const variables = roots.filter((node) => node.nodeClass === NODE_CLASS_VARIABLE);
+      const variables = roots.filter((node) => node.nodeClass === 'Variable');
 
-      for (const folder of roots.filter((node) => node.nodeClass === NODE_CLASS_OBJECT)) {
+      for (const folder of roots.filter((node) => node.nodeClass === 'Object')) {
         const children = await this.client.browse(folder.nodeId);
-        variables.push(...children.filter((node) => node.nodeClass === NODE_CLASS_VARIABLE));
+        variables.push(...children.filter((node) => node.nodeClass === 'Variable'));
       }
 
       await LogFormatter.attachJson(this.logger, 'Discovered variables', variables);
